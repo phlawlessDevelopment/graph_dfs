@@ -2,13 +2,6 @@
 import { useEffect, useState } from 'react';
 import { GraphCanvas } from 'reagraph';
 
-
-class Node {
-  constructor(id) {
-    this.id = id;
-    this.label = `[${id}] `;
-  }
-}
 class Edge {
   constructor(source, target, id, label) {
     this.source = source;
@@ -16,9 +9,6 @@ class Edge {
     this.id = id;
     this.label = label;
   }
-}
-function randomInt(min, max) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 class Adjacency {
@@ -28,32 +18,45 @@ class Adjacency {
     this.id = id;
   }
 }
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+class Node {
+  constructor(id) {
+    this.id = id;
+    this.label = `[${id}] `;
+  }
+}
 const weights = [1, 0, -1];
 
 function createRandomGraph(n) {
   const letters = Array.from({ length: 26 }, (_, i) => String.fromCharCode('A'.charCodeAt(0) + i));
   const adj = {};
   let nodes = [];
+  // Create n nodes
   for (let i = 0; i < n; i++) {
     nodes.push(new Node(letters[i], ''));
     adj[letters[i]] = [];
   }
+  // Shuffle the nodes array using Fisher-Yates shuffle
+  for (let i = nodes.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [nodes[i], nodes[j]] = [nodes[j], nodes[i]];
+  }
+  // assign edges in a circle
   for (let i = 0; i < n; i++) {
-    const tmpNodes = nodes.filter(n => n.id != letters[i]).sort(() => Math.random() - 0.5);
-    const numEdges = randomInt(2, n > 4 ? n : 4);
-    for (let j = 0; j < numEdges; j++) {
-      const weight = weights[randomInt(0, weights.length - 1)];
-      if (!tmpNodes[j]) break;
-      adj[tmpNodes[j].id].push(new Adjacency(nodes[i], weight, tmpNodes[j].id + "-" + nodes[i].id));
-    }
+    const fromNode = nodes[i];
+    const toNode = nodes[(i + 1) % n];
+    const weight = weights[randomInt(0, weights.length - 1)];
+    adj[toNode.id].push(new Adjacency(fromNode, weight, toNode.id + "-" + fromNode.id));
+    adj[fromNode.id].push(new Adjacency(toNode, weight * -1, fromNode.id + "-" + toNode.id));
   }
   return [adj, nodes];
 }
 
 function depthFirstTraversal(currentNode, age, nodes, adj, visited = []) {
-
-  // console.log(currentNode, age);
-
   const adjacencies = adj[currentNode];
   const node = nodes.find(n => n.id == currentNode);
   node.label += age.toString() + ",";
@@ -96,15 +99,25 @@ function convertToReaGraphEdges(adj) {
   return edges;
 }
 
+function dedupeNodeLabels(nodes) {
+  for (let i = 0; i < nodes.length; i++) {
+    nodes[i].label = [...new Set(nodes[i].label.replaceAll(',', ' ').split(' '))].join(',');
+  }
+}
+
 function cleanNodes(nodes) {
   for (let i = 0; i < nodes.length; i++) {
     nodes[i].label = `[${nodes[i].id}] `;
   }
 }
 
-function handleClickNode(setStartAge, startAge, nodes) {
+function handleClickNode(node, startNode, setStartNode, setStartAge, startAge, nodes) {
+  if (node.id !== startNode) {
+    setStartNode(node.id);
+  } else {
+    setStartAge(Math.max((startAge + 1) % 4, 1));
+  }
   cleanNodes(nodes);
-  setStartAge(Math.max((startAge + 1) % 4, 1));
 }
 
 
@@ -115,25 +128,27 @@ export default function Home() {
   const [rg_nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [startAge, setStartAge] = useState(1);
+  const [startNode, setStartNode] = useState("A");
 
   useEffect(() => {
     [adj, nodes] = createRandomGraph(6);
-    depthFirstTraversal("A", startAge, nodes, adj);
+    depthFirstTraversal(startNode, startAge, nodes, adj);
+    dedupeNodeLabels(nodes);
     setNodes(nodes);
     setEdges(convertToReaGraphEdges(adj));
   }, []);
 
   useEffect(() => {
-    cleanNodes(nodes);
-    depthFirstTraversal("A", startAge, nodes, adj);
+    depthFirstTraversal(startNode, startAge, nodes, adj);
+    dedupeNodeLabels(nodes);
     setNodes(nodes);
     setEdges(convertToReaGraphEdges(adj));
-  }, [startAge]);
+  }, [startAge, startNode]);
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-between p-24">
       <GraphCanvas labelType="all" layoutType='forceDirected2d' draggable edgeInterpolation="curved"
-        nodes={rg_nodes} edges={edges} onEdgeClick={edge => alert(`Weight: ${edge.label}`)} onNodeClick={() => handleClickNode(setStartAge, startAge, nodes)} />
+        nodes={rg_nodes} edges={edges} onEdgeClick={edge => alert(`Weight: ${edge.label}`)} onNodeClick={(n) => handleClickNode(n, startNode, setStartNode, setStartAge, startAge, nodes)} />
     </main>
   )
 }
