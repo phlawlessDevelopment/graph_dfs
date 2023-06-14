@@ -1,6 +1,6 @@
 "use client"
-import { useEffect, useState } from 'react';
-import { GraphCanvas } from 'reagraph';
+import { useEffect, useState, useRef } from 'react';
+import { GraphCanvas, GraphCanvasRef, useSelection } from 'reagraph';
 
 class Edge {
   constructor(source, target, id, label) {
@@ -53,8 +53,33 @@ function createRandomGraph(n) {
     adj[toNode.id].push(new Adjacency(fromNode, weight, toNode.id + "-" + fromNode.id));
     adj[fromNode.id].push(new Adjacency(toNode, weight * -1, fromNode.id + "-" + toNode.id));
   }
+  extraEdges(n, nodes, adj);
   return [adj, nodes];
 }
+
+function extraEdges(n, nodes, adj) {
+
+  const weight = weights[randomInt(0, weights.length - 1)];
+  if (n % 3 === 0) {
+    n = Math.round(n / 3)
+    for (let i = 0; i < n; i++) {
+      const start = (i * n) % nodes.length;
+      const startNode = nodes[start];
+      const endNode = nodes[(start + 3) % nodes.length];
+      const weight = weights[randomInt(0, weights.length - 1)];
+      adj[startNode.id].push(new Adjacency(startNode, weight, endNode.id + "-" + startNode.id));
+      adj[startNode.id].push(new Adjacency(endNode, weight, startNode.id + "-" + endNode.id));
+    }
+  }
+  else if (n % 5 === 0) {
+    // get the 4 nodes in a row in the array, assuming it's a ring 
+    const start = 0;
+    const startNode = nodes[start];
+
+  }
+}
+
+
 
 function depthFirstTraversal(currentNode, age, nodes, adj, visited = []) {
   const adjacencies = adj[currentNode];
@@ -131,7 +156,7 @@ export default function Home() {
   const [startNode, setStartNode] = useState("A");
 
   useEffect(() => {
-    [adj, nodes] = createRandomGraph(6);
+    [adj, nodes] = createRandomGraph(5);
     depthFirstTraversal(startNode, startAge, nodes, adj);
     dedupeNodeLabels(nodes);
     setNodes(nodes);
@@ -147,8 +172,12 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <GraphCanvas labelType="all" layoutType='forceDirected2d' draggable edgeInterpolation="curved"
-        nodes={rg_nodes} edges={edges} onEdgeClick={edge => alert(`Weight: ${edge.label}`)} onNodeClick={(n) => handleClickNode(n, startNode, setStartNode, setStartAge, startAge, nodes)} />
+      <GraphCanvas labelType="all" layoutType='forceDirected2d'
+        nodes={rg_nodes} edges={edges}
+        draggable
+        onEdgeClick={edge => alert(`Weight: ${edge.label}`)}
+        onNodeClick={(n) => handleClickNode(n, startNode, setStartNode, setStartAge, startAge, nodes)}
+      />
     </main>
   )
 }
